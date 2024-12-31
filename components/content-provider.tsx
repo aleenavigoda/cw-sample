@@ -1,8 +1,11 @@
-'use client'
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { SectionCard } from './section-card';
+import React, { useState, useEffect } from "react";
+import { SectionCard } from "./section-card";
 
+/**
+ * Types for your DB rows
+ */
 interface ColumnContent {
   id: number;
   issue_number: number;
@@ -20,13 +23,61 @@ interface NewsletterIssue {
   cover_image: string;
 }
 
+/**
+ * We define each known section_name from your DB and how 
+ * to display it in the UI. (title, category, colorAccent, etc.)
+ */
+const sectionNameMap = {
+  "Knowledge Base": {
+    cardTitle: "Knowledge Base",
+    category: "New in Every",
+    colorAccent: "rgb(168, 85, 247)",
+    className: "lg:col-span-3",
+    renderMode: "html" as const,
+  },
+  "Release Notes": {
+    cardTitle: "Release Notes",
+    category: "Field Report",
+    colorAccent: "rgb(34, 197, 94)",
+    className: "lg:col-span-6",
+    renderMode: "html" as const,
+  },
+  "Fine Tuning": {
+    cardTitle: "Fine Tuning",
+    category: "Market Signals",
+    colorAccent: "rgb(234, 179, 8)",
+    className: "lg:col-span-3",
+    renderMode: "html" as const,
+  },
+  "Hallucination": {
+    cardTitle: "Hallucination",
+    category: "Imagine",
+    colorAccent: "rgb(244, 63, 94)",
+    className: "lg:col-span-6",
+    renderMode: "image" as const,
+  },
+  "Alignment": {
+    cardTitle: "Alignment",
+    category: "Refresh",
+    colorAccent: "rgb(74, 158, 255)",
+    className: "lg:col-span-6",
+    renderMode: "html" as const,
+  },
+} as const;
+
+type SectionName = keyof typeof sectionNameMap;
+
 interface ContentProviderProps {
   currentIssue: number;
 }
 
 export function ContentProvider({ currentIssue }: ContentProviderProps) {
+  // We'll fetch data from /api/content?issue=...
   const [columnContent, setColumnContent] = useState<ColumnContent[]>([]);
+  // We'll fetch but ignore the newsletterIssue for now
+  // (we do not display headline/subheadline anywhere)
   const [newsletterIssue, setNewsletterIssue] = useState<NewsletterIssue | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
@@ -37,13 +88,14 @@ export function ContentProvider({ currentIssue }: ContentProviderProps) {
         const data = await response.json();
         
         if (response.ok) {
-          setColumnContent(data.columnContent);
-          setNewsletterIssue(data.newsletterIssue);
+          // We store them, but do not actually display the newsletterIssue 
+          setColumnContent(data.columnContent || []);
+          setNewsletterIssue(data.newsletterIssue || null);
         } else {
-          console.error('Failed to fetch content:', data.error);
+          console.error("Failed to fetch content:", data.error);
         }
       } catch (error) {
-        console.error('Error fetching content:', error);
+        console.error("Error fetching content:", error);
       } finally {
         setLoading(false);
       }
@@ -52,10 +104,11 @@ export function ContentProvider({ currentIssue }: ContentProviderProps) {
     fetchContent();
   }, [currentIssue]);
 
-  const toggleSection = (sectionName: string) => {
-    setExpandedSections(prev => ({
+  // Toggles preview vs. full text for each section
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => ({
       ...prev,
-      [sectionName]: !prev[sectionName]
+      [section]: !prev[section],
     }));
   };
 
@@ -63,156 +116,94 @@ export function ContentProvider({ currentIssue }: ContentProviderProps) {
     return <div>Loading...</div>;
   }
 
+  /**
+   * We'll map over the keys in sectionNameMap and see if there's 
+   * any columnContent for that section. If so, display a card.
+   */
+  const orderedSections: SectionName[] = [
+    "Knowledge Base",
+    "Release Notes",
+    "Fine Tuning",
+    "Hallucination",
+    "Alignment",
+  ];
+
   return (
     <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-12">
-      {/* Knowledge Base Section */}
-      <SectionCard 
-        title="Knowledge Base"
-        className="lg:col-span-3"
-        category="New in Every"
-        author="our writers"
-        colorAccent="rgb(168, 85, 247)"
-        scrollable
-      >
-        <div className="space-y-8">
-          {columnContent
-            .filter(content => content.section_name === 'Knowledge Base' && content.issue_number === currentIssue)
-            .map((content) => (
-              <div 
-                key={content.id} 
-                className="space-y-2"
-                dangerouslySetInnerHTML={{ __html: content.preview_text || '' }}
-              />
-            ))}
-        </div>
-      </SectionCard>
+      {orderedSections.map((sectionName) => {
+        const config = sectionNameMap[sectionName];
+        if (!config) return null;
 
-      {/* Field Report Section */}
-      <SectionCard 
-        className="lg:col-span-6"
-        category="Field Report"
-        colorAccent="rgb(34, 197, 94)"
-        scrollable
-      >
-        {newsletterIssue && (
-          <div className="space-y-8">
-            <img 
-              src={newsletterIssue.cover_image}
-              alt="Cover"
-              className="w-full aspect-[1.91/1] object-cover rounded-2xl"
-            />
-            
-            <div className="space-y-4">
-              <h1 className="font-serif text-2xl text-white">
-                {newsletterIssue.headline}
-              </h1>
-              
-              <h2 className="text-sm text-slate-300">
-                {newsletterIssue.subheadline}
-              </h2>
-              
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <span>{newsletterIssue.publication_date}</span>
+        // All rows for this section
+        const rows = columnContent.filter(
+          (c) => c.section_name === sectionName && c.issue_number === currentIssue
+        );
+        if (rows.length === 0) {
+          return null;
+        }
+
+        return (
+          <SectionCard
+            key={sectionName}
+            title={config.cardTitle}
+            category={config.category}
+            colorAccent={config.colorAccent}
+            className={config.className}
+            scrollable
+            onMaximize={() => toggleSection(sectionName)}
+          >
+            {/* Release Notes => special heading 'Release notes' */}
+            {sectionName === "Release Notes" && (
+              <div className="space-y-6">
+                <h2 className="font-serif text-2xl text-white mb-6">Release notes</h2>
+                {rows.map((item) => (
+                  <div
+                    key={item.id}
+                    dangerouslySetInnerHTML={{
+                      __html: expandedSections[sectionName]
+                        ? item.full_text
+                        : item.preview_text || item.full_text,
+                    }}
+                  />
+                ))}
               </div>
-              
-              <div 
-                className="text-sm text-slate-400 italic"
-                dangerouslySetInnerHTML={{ __html: newsletterIssue.editors_note }}
-              />
-            </div>
+            )}
 
-            {/* Release Notes Section */}
-            <div className="pt-8 space-y-6">
-              {columnContent
-                .filter(content => content.section_name === 'Release Notes')
-                .map((content) => (
-                  <div key={content.id}>
-                    <h2 className="font-serif text-2xl text-white mb-6">
-                      Release notes
-                    </h2>
-                    <div 
-                      dangerouslySetInnerHTML={{ 
-                        __html: content.full_text 
-                      }} 
+            {/* Hallucination => interpret full_text as image URL */}
+            {config.renderMode === "image" && sectionName === "Hallucination" && (
+              <div className="space-y-4">
+                {rows.map((item) => (
+                  <div key={item.id}>
+                    <img
+                      src={item.full_text}
+                      alt="Hallucination"
+                      className="w-full aspect-[1.91/1] object-cover rounded-2xl"
                     />
                   </div>
                 ))}
-            </div>
-          </div>
-        )}
-      </SectionCard>
-
-      {/* Fine Tuning Section */}
-      <SectionCard 
-        title="Fine Tuning"
-        className="lg:col-span-3"
-        category="Market Signals"
-        colorAccent="rgb(234, 179, 8)"
-        scrollable
-        onMaximize={() => toggleSection('Fine Tuning')}
-      >
-        <div className="space-y-6">
-          {columnContent
-            .filter(content => content.section_name === 'Fine Tuning')
-            .map((content) => (
-              <div key={content.id} className="space-y-2">
-                <div 
-                  dangerouslySetInnerHTML={{ 
-                    __html: expandedSections['Fine Tuning'] ? content.full_text : (content.preview_text || content.full_text)
-                  }} 
-                />
               </div>
-            ))}
-        </div>
-      </SectionCard>
+            )}
 
-      {/* Hallucination Section */}
-      <SectionCard 
-        title="Hallucination"
-        className="lg:col-span-6"
-        category="Imagine"
-        colorAccent="rgb(244, 63, 94)"
-        scrollable
-        onMaximize={() => toggleSection('Hallucination')}
-      >
-        <div className="space-y-4">
-          {columnContent
-            .filter(content => content.section_name === 'Hallucination')
-            .map((content) => (
-              <div key={content.id}>
-                <img 
-                  src={content.full_text} 
-                  alt="Hallucination"
-                  className="w-full aspect-[1.91/1] object-cover rounded-2xl"
-                />
-              </div>
-            ))}
-        </div>
-      </SectionCard>
-
-      {/* Alignment Section */}
-      <SectionCard 
-        title="Alignment"
-        className="lg:col-span-6"
-        category="Refresh"
-        colorAccent="rgb(74, 158, 255)"
-        scrollable
-        onMaximize={() => toggleSection('Alignment')}
-      >
-        <div className="prose prose-invert prose-sm max-w-none">
-          {columnContent
-            .filter(content => content.section_name === 'Alignment')
-            .map((content) => (
-              <div key={content.id}>
-                <div 
-                  dangerouslySetInnerHTML={{ 
-                    __html: expandedSections['Alignment'] ? content.full_text : (content.preview_text || content.full_text)
-                  }} 
-                />
-              </div>
-            ))}
-        </div>
-      </SectionCard>
+            {/* Normal HTML (Knowledge Base, Fine Tuning, Alignment) */}
+            {config.renderMode === "html" &&
+              sectionName !== "Release Notes" && (
+                <div className="space-y-4">
+                  {rows.map((item) => (
+                    <div key={item.id}>
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: expandedSections[sectionName]
+                            ? item.full_text
+                            : item.preview_text || item.full_text,
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+          </SectionCard>
+        );
+      })}
     </div>
   );
 }

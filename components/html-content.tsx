@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface HtmlContentProps {
   previewText?: string | null;
@@ -6,17 +6,17 @@ interface HtmlContentProps {
   isExpanded: boolean;
 }
 
-export const HtmlContent: React.FC<HtmlContentProps> = ({ 
-  previewText, 
-  fullText, 
-  isExpanded 
+export const HtmlContent: React.FC<HtmlContentProps> = ({
+  previewText,
+  fullText,
+  isExpanded,
 }) => {
-  const content = (isExpanded || !previewText) ? fullText : previewText;
-  
+  const content = isExpanded || !previewText ? fullText : previewText;
+
   return (
-    <div 
+    <div
       className="prose prose-invert prose-sm max-w-none"
-      dangerouslySetInnerHTML={{ __html: content }} 
+      dangerouslySetInnerHTML={{ __html: content }}
     />
   );
 };

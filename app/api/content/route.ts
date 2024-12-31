@@ -1,46 +1,37 @@
-import { db } from '@/lib/db';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { pgTable, serial, integer, text, varchar } from 'drizzle-orm/pg-core';
+import { db } from '@/lib/db';
+import { eq } from 'drizzle-orm';
+import { newsletterIssues, columnContent } from '@/lib/schema';
 
-// Schema definitions
-const newsletterIssues = pgTable('newsletter_issues', {
-  issueNumber: integer('issue_number').primaryKey(),
-  publicationDate: varchar('publication_date'),
-  headline: text('headline'),
-  subheadline: text('subheadline'),
-  editorsNote: text('editors_note'),
-  coverImage: text('cover_image')
-});
-
-const columnContent = pgTable('column_content', {
-  id: serial('id').primaryKey(),
-  issueNumber: integer('issue_number'),
-  sectionName: varchar('section_name'),
-  previewText: text('preview_text'),
-  fullText: text('full_text')
-});
-
+/**
+ * This route fetches:
+ *  - newsletterIssue (but we won't display it in the UI)
+ *  - columnContent
+ * for a given ?issue=XXXX
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const issueNumber = searchParams.get('issue');
+  const issueParam = searchParams.get('issue');
 
-  if (!issueNumber) {
-    return NextResponse.json({ error: 'Issue number is required' }, { status: 400 });
+  if (!issueParam) {
+    return NextResponse.json(
+      { error: 'Issue number is required' },
+      { status: 400 }
+    );
   }
 
   try {
-    const issueNum = parseInt(issueNumber);
+    const issueNum = parseInt(issueParam);
 
-    // Fetch newsletter issue
+    // 1) Fetch the newsletterIssue row, if needed
+    // We won't display it, but we'll fetch it so the route remains flexible
     const issue = await db
       .select()
       .from(newsletterIssues)
       .where(eq(newsletterIssues.issueNumber, issueNum))
       .limit(1);
 
-    // Fetch column content
+    // 2) Fetch the columnContent rows
     const content = await db
       .select()
       .from(columnContent)
@@ -48,14 +39,15 @@ export async function GET(request: Request) {
 
     if (!issue || issue.length === 0) {
       return NextResponse.json(
-        { error: 'Newsletter issue not found' },
+        { error: `Newsletter issue ${issueNum} not found` },
         { status: 404 }
       );
     }
 
     return NextResponse.json({
+      // We'll return it if you ever change your mind and want to display it
       newsletterIssue: issue[0],
-      columnContent: content
+      columnContent: content,
     });
   } catch (error) {
     console.error('Database error:', error);
