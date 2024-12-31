@@ -17,6 +17,7 @@ interface SectionCardProps {
   category?: string
   author?: string
   colorAccent?: string
+  onMaximize?: () => void
 }
 
 export function SectionCard({ 
@@ -28,7 +29,8 @@ export function SectionCard({
   maxHeight = "500px",
   category,
   author,
-  colorAccent = "rgb(74, 158, 255)"
+  colorAccent = "rgb(74, 158, 255)",
+  onMaximize
 }: SectionCardProps) {
   const [isOpen, setIsOpen] = React.useState(false)
 
@@ -105,7 +107,10 @@ export function SectionCard({
           variant="ghost" 
           size="sm" 
           className="absolute top-4 right-4 text-slate-500 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-slate-800/50 transition-all duration-200 rounded-xl"
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            setIsOpen(true);
+            onMaximize?.();
+          }}
         >
           <Maximize2 className="h-4 w-4" />
         </Button>
